@@ -1,0 +1,99 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String?
+  googleConnected   Boolean   @default(false)
+  slackConnected    Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  meetings          Meeting[]
+  actionItems       ActionItem[] @relation("Assignee")
+  createdTasks      ActionItem[] @relation("Creator")
+  organizations     OrganizationMember[]
+}
+
+model Organization {
+  id          String    @id @default(cuid())
+  name        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  members     OrganizationMember[]
+  meetings    Meeting[]
+}
+
+model OrganizationMember {
+  id              String        @id @default(cuid())
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  user            User         @relation(fields: [userId], references: [id])
+  userId          String
+  role            String       // ADMIN, MEMBER
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([organizationId, userId])
+}
+
+model Meeting {
+  id                String       @id @default(cuid())
+  title            String
+  description      String?      @db.Text
+  startTime        DateTime
+  endTime          DateTime
+  status           String       // SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+  googleMeetLink   String?
+  googleCalendarId String?
+  recordingUrl     String?      @db.Text
+  transcriptUrl    String?      @db.Text
+  summary          String?      @db.Text
+  organization     Organization  @relation(fields: [organizationId], references: [id])
+  organizationId   String
+  creator          User         @relation(fields: [creatorId], references: [id])
+  creatorId        String
+  participants     MeetingParticipant[]
+  actionItems      ActionItem[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model MeetingParticipant {
+  id          String   @id @default(cuid())
+  meeting     Meeting  @relation(fields: [meetingId], references: [id])
+  meetingId   String
+  email       String
+  name        String?
+  role        String   // ORGANIZER, ATTENDEE
+  attended    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([meetingId, email])
+}
+
+model ActionItem {
+  id          String    @id @default(cuid())
+  title       String
+  description String?   @db.Text
+  dueDate     DateTime?
+  priority    String?   // HIGH, MEDIUM, LOW
+  status      String    // PENDING, IN_PROGRESS, COMPLETED
+  meeting     Meeting   @relation(fields: [meetingId], references: [id])
+  meetingId   String
+  assignee    User      @relation("Assignee", fields: [assigneeId], references: [id])
+  assigneeId  String
+  creator     User      @relation("Creator", fields: [creatorId], references: [id])
+  creatorId   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
